@@ -1,0 +1,29 @@
+name: Release
+
+# Publishes packages/next-blog to npm when a tag like v0.1.0 is pushed. Uses npm trusted
+# publishing, so no npm token is stored in this repository.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      # npm shows the README and LICENSE from the package folder.
+      - run: cp README.md LICENSE packages/next-blog/
+      - run: npm publish --access public
+        working-directory: packages/next-blog

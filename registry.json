@@ -1,0 +1,39 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "kitful",
+  "homepage": "https://kitful.ai",
+  "items": [
+    {
+      "name": "blog",
+      "type": "registry:item",
+      "title": "Kitful blog",
+      "description": "A /blog index, post pages, a blog sitemap and the route that refreshes them when you publish, update or delete a post in Kitful.",
+      "dependencies": ["@kitful/next-blog"],
+      "envVars": {
+        "KITFUL_READ_TOKEN": ""
+      },
+      "files": [
+        {
+          "path": "examples/basic/app/blog/page.tsx",
+          "type": "registry:page",
+          "target": "app/blog/page.tsx"
+        },
+        {
+          "path": "examples/basic/app/blog/[slug]/page.tsx",
+          "type": "registry:page",
+          "target": "app/blog/[slug]/page.tsx"
+        },
+        {
+          "path": "examples/basic/app/blog/sitemap.ts",
+          "type": "registry:page",
+          "target": "app/blog/sitemap.ts"
+        },
+        {
+          "path": "examples/basic/app/api/kitful/revalidate/route.ts",
+          "type": "registry:page",
+          "target": "app/api/kitful/revalidate/route.ts"
+        }
+      ]
+    }
+  ]
+}

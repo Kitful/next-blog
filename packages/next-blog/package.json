@@ -1,0 +1,50 @@
+{
+  "name": "@kitful/next-blog",
+  "version": "0.1.0",
+  "description": "Show the articles you publish from Kitful on your Next.js site, refreshed seconds after every change.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "homepage": "https://kitful.ai/docs/integrations/nextjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kitful/next-blog.git",
+    "directory": "packages/next-blog"
+  },
+  "bugs": "https://github.com/Kitful/next-blog/issues",
+  "keywords": ["kitful", "nextjs", "blog", "headless", "seo"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "bun run typecheck && bun run test && bun run build",
+    "prepublishOnly": "bun run check"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "standardwebhooks": "1.1.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "kitful-next-blog-repo",
+  "private": true,
+  "workspaces": ["packages/*", "examples/*"],
+  "scripts": {
+    "check": "bun run --cwd packages/next-blog check",
+    "example": "bun run --cwd examples/basic dev"
+  }
+}
