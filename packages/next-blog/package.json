@@ -1,6 +1,6 @@
 {
   "name": "@kitful/next-blog",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Show the articles you publish from Kitful on your Next.js site, refreshed seconds after every change.",
   "license": "MIT",
   "type": "module",

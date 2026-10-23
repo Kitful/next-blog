@@ -1,10 +1,9 @@
 name: Release
 
-# Publishes packages/next-blog to npm when a tag like v0.2.0 is pushed. Uses npm trusted
-# publishing, so no npm token is stored in this repository. Trusted publishing is set up on an
-# existing package, so the first version is published by hand. The job runs in the `npm`
-# environment, which needs a reviewer's approval and is the environment named in npm's trusted
-# publisher settings.
+# Stages packages/next-blog on npm when a tag like v0.2.0 is pushed. Uses npm trusted
+# publishing, so no npm token is stored in this repository. A staged version goes public only
+# after a maintainer approves it with 2FA, on npmjs.com or with `npm stage approve`. The job runs
+# in the `npm` environment, the one named in npm's trusted publisher settings.
 on:
   push:
     tags: ['v*']
@@ -30,5 +29,5 @@ jobs:
       - run: bun install --frozen-lockfile
       # npm shows the README and LICENSE from the package folder.
       - run: cp README.md LICENSE packages/next-blog/
-      - run: npm publish
+      - run: npm stage publish
         working-directory: packages/next-blog
