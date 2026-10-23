@@ -6,6 +6,11 @@ import type { KitfulNotification } from './types.js';
 // The Standard Webhooks window: a notification older or newer than this is a replay.
 const TOLERANCE_SECONDS = 300;
 const encoder = new TextEncoder();
+const PROFILES: Record<string, 'max' | { expire: number } | undefined> = {
+  'post.published': { expire: 0 },
+  'post.updated': 'max',
+  'post.deleted': { expire: 0 }
+};
 
 function decodeBase64(value: string): Uint8Array<ArrayBuffer> | null {
   try {
@@ -39,7 +44,8 @@ export async function verifyNotification(
   const signatures = headers.get('webhook-signature');
   if (!id || !timestamp || !signatures) return false;
   const seconds = Number(timestamp);
-  if (!Number.isInteger(seconds) || Math.abs(now / 1000 - seconds) > TOLERANCE_SECONDS) return false;
+  if (!Number.isInteger(seconds) || Math.abs(now / 1000 - seconds) > TOLERANCE_SECONDS)
+    return false;
   const signed = encoder.encode(`${id}.${timestamp}.${body}`);
   for (const entry of signatures.split(' ')) {
     const [version, signature] = entry.split(',');
@@ -52,9 +58,9 @@ export async function verifyNotification(
 
 /**
  * The `POST` handler for `app/api/kitful/revalidate/route.ts`. It verifies Kitful's notification
- * and refreshes the cached pages it names. A publish or delete expires them at once, since a stale
- * post list would 404 a new post or keep serving a deleted one; an edit serves the old version
- * once while the new one renders.
+ * and refreshes the cached pages it names. A publish or delete expires them at once, so the list
+ * shows a new post and drops a deleted one on the next visit; an edit serves the old version while
+ * the new one renders.
  */
 export function createRevalidateHandler(options: { secret?: string } = {}) {
   let key: Promise<CryptoKey> | undefined;
@@ -63,8 +69,10 @@ export function createRevalidateHandler(options: { secret?: string } = {}) {
       key = undefined;
       throw error;
     });
+    // Awaited before the body, so a missing token fails here with its own message.
+    const cryptoKey = await key;
     const body = await request.text();
-    if (!(await verifyNotification(body, request.headers, await key))) {
+    if (!(await verifyNotification(body, request.headers, cryptoKey))) {
       return Response.json({ error: 'Invalid signature.' }, { status: 401 });
     }
 
@@ -74,9 +82,11 @@ export function createRevalidateHandler(options: { secret?: string } = {}) {
     } catch {
       return Response.json({ error: 'Invalid body.' }, { status: 400 });
     }
-    if (notification.type === 'webhook.test') return Response.json({ ok: true });
-
-    const profile = notification.type === 'post.updated' ? 'max' : { expire: 0 };
+    // Event types Kitful adds later are acknowledged and ignored, as the API contract asks.
+    const profile = Object.hasOwn(PROFILES, notification.type)
+      ? PROFILES[notification.type]
+      : undefined;
+    if (!profile) return Response.json({ ok: true, revalidated: [] });
     const tags = (notification.data?.tags ?? []).filter(
       (tag): tag is string => typeof tag === 'string' && tag.startsWith('kitful:')
     );

@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["packages/*", "examples/*"],
   "scripts": {
-    "check": "bun run --cwd packages/next-blog check",
+    "check": "bun run --cwd packages/next-blog check && bun run --cwd examples/basic typecheck",
     "example": "bun run --cwd examples/basic dev"
   }
 }

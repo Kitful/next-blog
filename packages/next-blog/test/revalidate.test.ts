@@ -90,6 +90,14 @@ describe('createRevalidateHandler', () => {
     expect(response.status).toBe(200);
   });
 
+  it('fails with the missing-token message, then recovers once the token is set', async () => {
+    delete process.env.KITFUL_READ_TOKEN;
+    const handler = createRevalidateHandler();
+    await expect(handler(signedRequest(updated))).rejects.toThrow('KITFUL_READ_TOKEN is not set');
+    process.env.KITFUL_READ_TOKEN = TOKEN;
+    expect((await handler(signedRequest(updated))).status).toBe(200);
+  });
+
   it('rejects a wrong signature and touches no cache', async () => {
     const other = `whsec_${createHash('sha256').update('another token').digest('base64')}`;
     const response = await createRevalidateHandler()(signedRequest(updated, other));
@@ -110,6 +118,15 @@ describe('createRevalidateHandler', () => {
     expect(response.status).toBe(200);
     expect(revalidateTag).not.toHaveBeenCalled();
   });
+
+  it.each(['post.archived', 'constructor'])(
+    'acknowledges the unknown type %s and refreshes nothing',
+    async (type) => {
+      const response = await createRevalidateHandler()(signedRequest({ ...updated, type }));
+      expect(response.status).toBe(200);
+      expect(revalidateTag).not.toHaveBeenCalled();
+    }
+  );
 
   it('ignores tags outside the kitful namespace', async () => {
     await createRevalidateHandler()(

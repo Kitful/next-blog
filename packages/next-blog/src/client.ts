@@ -1,4 +1,5 @@
 import type { Metadata, MetadataRoute } from 'next';
+import { notFound } from 'next/navigation';
 
 import type { KitfulPage, KitfulPost, KitfulPostSummary } from './types.js';
 
@@ -85,21 +86,12 @@ export async function getAllPosts(): Promise<KitfulPostSummary[]> {
 }
 
 /**
- * One post with its body, or null when no post has this slug. The post's `slug` can differ from
- * the one asked for when it was renamed; redirect to it.
- *
- * The slug is looked up in the cached list first: Next.js never caches a 404, so fetching an
- * unknown slug would make the page uncacheable, and under Cache Components fail its render.
+ * One post with its body, or null when no post has this slug. Fetched by slug rather than found in
+ * the cached list: the first render of a post published after the build can read the list as the
+ * build cached it, and would serve the new post as not found.
  */
 export async function getPost(slug: string): Promise<KitfulPost | null> {
-  const posts = await getAllPosts();
-  const listed =
-    posts.find((post) => post.slug === slug) ??
-    posts.find((post) => post.previous_slugs.includes(slug));
-  if (!listed) return null;
-  return request<KitfulPost>(`/blog/posts/${encodeURIComponent(listed.slug)}`, [
-    postTag(listed.slug)
-  ]);
+  return request<KitfulPost>(`/blog/posts/${encodeURIComponent(slug)}`, [postTag(slug)]);
 }
 
 /** For `generateStaticParams` in `app/blog/[slug]/page.tsx`. */
@@ -108,10 +100,13 @@ export async function getStaticSlugs(): Promise<{ slug: string }[]> {
   return posts.length ? posts.map((post) => ({ slug: post.slug })) : [{ slug: NO_POSTS_SLUG }];
 }
 
-/** For `generateMetadata` in `app/blog/[slug]/page.tsx`. */
+/**
+ * For `generateMetadata` in `app/blog/[slug]/page.tsx`. A missing post calls `notFound()` here, so
+ * crawlers that get the page without streaming receive a 404.
+ */
 export async function getArticleMetadata(slug: string): Promise<Metadata> {
   const post = await getPost(slug);
-  if (!post) return {};
+  if (!post) notFound();
   const image = post.open_graph.image_url ?? post.featured_image?.url;
   const images = image ? [image] : undefined;
   const description = post.seo.description ?? undefined;
@@ -138,8 +133,22 @@ export async function getArticleMetadata(slug: string): Promise<Metadata> {
   };
 }
 
+// A canonical typed by hand still names the post when only the scheme or a trailing slash differs.
+function samePage(canonical: string, url: string): boolean {
+  try {
+    const [a, b] = [new URL(canonical, url), new URL(url)];
+    const path = (u: URL) => u.pathname.replace(/\/$/, '');
+    return a.host === b.host && path(a) === path(b) && a.search === b.search;
+  } catch {
+    return false;
+  }
+}
+
 /** For `app/blog/sitemap.ts`. */
 export async function blogSitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await getAllPosts();
-  return posts.map((post) => ({ url: post.url, lastModified: post.updated_at }));
+  // A post whose canonical is another page belongs in that page's sitemap.
+  return posts
+    .filter((post) => samePage(post.seo.canonical_url, post.url))
+    .map((post) => ({ url: post.url, lastModified: post.updated_at }));
 }

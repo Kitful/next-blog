@@ -41,19 +41,9 @@ export interface KitfulPost extends KitfulPostSummary {
   json_ld: Record<string, unknown>;
 }
 
-/** Returned by `updated_since` reads for a post that left the site. */
-export interface KitfulDeletedPost {
-  id: string;
-  status: string;
-  slug: string;
-  updated_at: string;
-}
-
 export interface KitfulPage<T> {
   data: T[];
   next_cursor: string | null;
-  /** Only on the last page of an `updated_since` read. */
-  next_updated_since?: string;
 }
 
 export interface KitfulNotification {

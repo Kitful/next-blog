@@ -58,5 +58,14 @@ export function FeaturedImage({
       />
     );
   }
-  return <img src={url} alt={alt} className={className} loading={preload ? 'eager' : 'lazy'} />;
+  return (
+    <img
+      src={url}
+      alt={alt}
+      width={width ?? undefined}
+      height={height ?? undefined}
+      className={className}
+      loading={preload ? 'eager' : 'lazy'}
+    />
+  );
 }

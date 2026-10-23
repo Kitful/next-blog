@@ -25,7 +25,11 @@ const post: KitfulPost = {
   reading_time_minutes: 1,
   word_count: 120,
   featured_image: null,
-  seo: { title: 'Hello', description: 'First post.', canonical_url: 'https://example.com/blog/hello' },
+  seo: {
+    title: 'Hello',
+    description: 'First post.',
+    canonical_url: 'https://example.com/blog/hello'
+  },
   open_graph: { title: 'Hello', description: null, image_url: null },
   headings: [],
   content: { html: '<p>Hi</p>', markdown: 'Hi' },
@@ -59,6 +63,7 @@ function serve(posts: KitfulPost[], detail: Record<string, Response> = {}) {
 describe('client', () => {
   it('sends the token and caches each call under its tag', async () => {
     serve([post]);
+    await getAllPosts();
     await getPost('hello');
     const [[listUrl, listInit], [postUrl, postInit]] = fetchMock.mock.calls as [
       [string, RequestInit],
@@ -74,16 +79,13 @@ describe('client', () => {
     });
   });
 
-  it('never fetches a slug the list does not have, so no uncacheable 404 is made', async () => {
-    serve([post]);
+  it('reads a post by its slug alone, never through the list', async () => {
+    serve([], { 'caf%C3%A9': json({ ...post, slug: 'café' }) });
+    expect((await getPost('café'))?.slug).toBe('café');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://kitful.ai/api/v1/blog/posts/caf%C3%A9'
+    ]);
     expect(await getPost('nope')).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('finds a renamed post by its previous slug', async () => {
-    serve([{ ...post, previous_slugs: ['old-hello'] }]);
-    expect((await getPost('old-hello'))?.slug).toBe('hello');
-    expect(fetchMock.mock.calls[1]![0]).toBe('https://kitful.ai/api/v1/blog/posts/hello');
   });
 
   it('follows KITFUL_API_URL', async () => {
@@ -99,7 +101,7 @@ describe('client', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('returns null for a post deleted after the list was cached', async () => {
+  it('returns null for a deleted post', async () => {
     serve([post], { hello: json({ code: 'gone' }, 410) });
     expect(await getPost('hello')).toBeNull();
   });
@@ -116,7 +118,9 @@ describe('client', () => {
   it('follows the cursor through every page', async () => {
     fetchMock
       .mockResolvedValueOnce(json({ data: [post], next_cursor: 'c2' }))
-      .mockResolvedValueOnce(json({ data: [{ ...post, id: 'a2', slug: 'two' }], next_cursor: null }));
+      .mockResolvedValueOnce(
+        json({ data: [{ ...post, id: 'a2', slug: 'two' }], next_cursor: null })
+      );
     const posts = await getAllPosts();
     expect(posts.map((p) => p.slug)).toEqual(['hello', 'two']);
     expect(fetchMock.mock.calls[1]![0]).toContain('cursor=c2');
@@ -127,6 +131,13 @@ describe('client', () => {
     expect(await getStaticSlugs()).toEqual([{ slug: '_no-posts-yet' }]);
   });
 
+  it('answers a missing post with notFound() so non-streaming crawlers get a 404', async () => {
+    serve([]);
+    await expect(getArticleMetadata('nope')).rejects.toMatchObject({
+      digest: 'NEXT_HTTP_ERROR_FALLBACK;404'
+    });
+  });
+
   it('builds metadata with the canonical and article dates', async () => {
     serve([post]);
     const metadata = await getArticleMetadata('hello');
@@ -134,10 +145,31 @@ describe('client', () => {
     expect(metadata.openGraph).toMatchObject({ type: 'article', description: 'First post.' });
   });
 
-  it('lists every post URL in the sitemap', async () => {
-    fetchMock.mockResolvedValueOnce(json({ data: [post], next_cursor: null }));
+  it('lists each post at its own URL, leaving out one canonical elsewhere', async () => {
+    const elsewhere = {
+      ...post,
+      slug: 'copy',
+      url: 'https://example.com/blog/copy',
+      seo: { ...post.seo, canonical_url: 'https://other.example/original' }
+    };
+    fetchMock.mockResolvedValueOnce(json({ data: [post, elsewhere], next_cursor: null }));
     expect(await blogSitemap()).toEqual([
       { url: 'https://example.com/blog/hello', lastModified: '2026-10-21T09:00:00Z' }
     ]);
+  });
+
+  it('keeps a post whose hand-typed canonical is its own address', async () => {
+    const typed = [
+      'http://example.com/blog/hello/',
+      '/blog/hello',
+      'https://example.com/blog/café'
+    ].map((canonical_url, i) => ({
+      ...post,
+      slug: `typed-${i}`,
+      url: i === 2 ? 'https://example.com/blog/caf%C3%A9' : post.url,
+      seo: { ...post.seo, canonical_url }
+    }));
+    fetchMock.mockResolvedValueOnce(json({ data: typed, next_cursor: null }));
+    expect(await blogSitemap()).toHaveLength(3);
   });
 });
